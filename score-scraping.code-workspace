@@ -1,0 +1,10 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {},
+	// "python.analysis.extraPaths": ["lib/python3.9/site-packages"],
+  	// "python.autoComplete.extraPaths": ["lib/python3.9/site-packages"]
+}
