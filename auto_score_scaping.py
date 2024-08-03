@@ -20,6 +20,24 @@ url = "https://ap.ceec.edu.tw/RegExam/ScoreSearch/Login?examtype=B"
 
 # input("=====================================")
 
+def solve_captcha(driver):
+    driver.save_screenshot('screenshot.png')
+    image = cv2.imread('screenshot.png')
+    # image = image[loc['y']: loc['y']+500, loc['x']: loc['x']+500]
+    image = image[1170: 1216, 809: 959]
+    raw_string = pytesseract.image_to_string(image, lang="eng", config='--psm 13 -c tessedit_char_whitelist=0123456789').replace("\n", '')
+    print(raw_string)
+    elem = driver.find_element(By.ID, "Captcha")
+    btn = elem.find_element(By.XPATH, "./..")
+    if len(raw_string) != 4:
+        btn.click()
+        solve_captcha(driver)
+        return
+    
+    solution = int(raw_string[:2]) + int(raw_string[-1])  
+    print(solution)
+    elem.send_keys(solution)
+    driver.find_element(By.ID, "login").click()
 def login(driver, ID, PID, fail_count=0):
     if fail_count > 5:
         return -1
@@ -28,22 +46,18 @@ def login(driver, ID, PID, fail_count=0):
     elem.send_keys(ID)
     elem = driver.find_element(By.ID, "PID")
     elem.send_keys(PID)
-    img = driver.find_element(By.ID, "valiCode")
+    solve_captcha(driver)
+    # img = driver.find_element(By.ID, "valiCode")
     # loc = img.location
-    driver.save_screenshot('screenshot.png')
-    image = cv2.imread('screenshot.png')
-    # image = image[loc['y']: loc['y']+500, loc['x']: loc['x']+500]
-    image = image[1170: 1216, 809: 959]
-    raw_string = pytesseract.image_to_string(image, lang="eng", config='--psm 13 -c tessedit_char_whitelist=0123456789').replace("\n", '')
-    print(raw_string)
-    if raw_string == "":
-        login(driver, ID, PID)
-    solution = int(raw_string[:2]) + int(raw_string[-1])  
-    print(solution)
-    elem = driver.find_element(By.ID, "Captcha")
-    elem.send_keys(solution)
-    driver.find_element(By.ID, "login").click()
+    
+    # input("wait")
     if driver.current_url != "https://ap.ceec.edu.tw/RegExam/ScoreSearch/StuResult":
+        prompt_text = driver.find_element(By.XPATH, "/html/body/div[4]/div[2]/div/div/div/div/div/div/div/div[3]/div/div").text
+        while (not prompt_text):
+            prompt_text = driver.find_element(By.XPATH, "/html/body/div[4]/div[2]/div/div/div/div/div/div/div/div[3]/div/div").text
+        if prompt_text == "成績查詢已保密":
+            print("成績查詢已保密")
+            return "secret"
         login(driver, ID, PID, fail_count+1)
     # try:
         # if driver.find_element(By.CLASS_NAME, "jconfirm-buttons"):
@@ -66,25 +80,50 @@ def login(driver, ID, PID, fail_count=0):
 # driver.delete_cookie("ADRUM_BTa")
 # driver.add_cookie(ADRUM_BTa)
 
-def get_data(driver):
+def get_data_ast(driver):
+    # try:
+        # input('wait')
+    data = {
+    "math_alpha": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[3]/div/table/tbody/tr/td[1]").text,
+    "chemistry": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[3]/div/table/tbody/tr/td[2]").text,
+    "physics": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[3]/div/table/tbody/tr/td[3]").text,
+    "biology": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[3]/div/table/tbody/tr/td[4]").text,
+    "history": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[3]/div/table/tbody/tr/td[5]").text,
+    "geography": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[3]/div/table/tbody/tr/td[6]").text,
+    "citizen": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[3]/div/table/tbody/tr/td[7]").text,
+    "chinese": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[5]/div/table/tbody/tr/td[1]").text,
+    "english": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[5]/div/table/tbody/tr/td[2]").text,
+    "mathA": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[5]/div/table/tbody/tr/td[3]").text,
+    "mathB": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[5]/div/table/tbody/tr/td[4]").text,
+    "society": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[5]/div/table/tbody/tr/td[5]").text,
+    "science": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[5]/div/table/tbody/tr/td[6]").text,
+    }
+    # except selenium.common.exceptions.NoSuchElementException: return -1
+    return data
+def get_data_gsat(driver):
     try:
         data = {
-        "math_alpha": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[3]/div/table/tbody/tr/td[1]").text,
-        "chemistry": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[3]/div/table/tbody/tr/td[2]").text,
-        "physics": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[3]/div/table/tbody/tr/td[3]").text,
-        "biology": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[3]/div/table/tbody/tr/td[4]").text,
-        "history": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[3]/div/table/tbody/tr/td[5]").text,
-        "geography": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[3]/div/table/tbody/tr/td[6]").text,
-        "citizen": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[3]/div/table/tbody/tr/td[7]").text,
-        "chinese": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[5]/div/table/tbody/tr/td[1]").text,
-        "english": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[5]/div/table/tbody/tr/td[2]").text,
-        "mathA": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[5]/div/table/tbody/tr/td[3]").text,
-        "mathB": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[5]/div/table/tbody/tr/td[4]").text,
-        "society": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[5]/div/table/tbody/tr/td[5]").text,
-        "science": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[5]/div/table/tbody/tr/td[6]").text,
+        "chinese": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[3]/div[2]").text,
+        "english": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[4]/div[2]").text,
+        "mathA": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[5]/div[2]").text,
+        "mathB": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[6]/div[2]").text,
+        "society": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[7]/div[2]").text,
+        "society": driver.find_element(By.XPATH, "/html/body/div[2]/div[1]/div/div/div[8]/div[2]").text,
         }
     except selenium.common.exceptions.NoSuchElementException: return -1
     return data
+def set_header_gsat(sheet_obj, start, output_path):
+    objects_list = ['國文', '英文', '數學A', '數學B', '社會', '自然']
+    for subject, i in zip(objects_list, range(13)):
+        sheet_obj.cell(row=1, column=start+i).value = subject
+    wb_obj.save(output_path)
+    
+def save_data_gsat(data, sheet_obj, start, row, output_path):
+    subject_list = ["chin", "english", "mathA", "mathB", "society", "science"]
+    for subject, i in zip(subject_list, range(0, len(subject_list)+1)):
+        sheet_obj.cell(row=row, column=start+i).value = data[subject]
+    wb_obj.save(output_path)
+
 def set_header(sheet_obj, start, output_path):
     objects_list = ['數學甲', '化學', '物理', '生物', '歷史', '地理', '公民', '國文', '英文', '數學Ａ', '數學Ｂ', '社會', '自然']
     for subject, i in zip(objects_list, range(13)):
@@ -92,11 +131,12 @@ def set_header(sheet_obj, start, output_path):
     wb_obj.save(output_path)
     
 def save_data(data, sheet_obj, start, row, output_path):
+    print(data)
     subject_list = ["math_alpha", "chemistry", "physics", "biology", "history", "geography", "citizen", "chinese", "english", "mathA", "mathB", "society", "science"]
     for subject, i in zip(subject_list, range(0, len(subject_list)+1)):
         sheet_obj.cell(row=row, column=start+i).value = data[subject]
     wb_obj.save(output_path)
-    
+
 def find_start(sheet_obj, row):
     pointer = 16
     is_empty = False
@@ -123,12 +163,15 @@ def find_name(name_list, sheet_obj, row):
 if __name__ == "__main__":
     for root, dirs, files in os.walk('.'):
         if "processing.xlsx" in files:
-            excel_file_name = "processing.xlsx"
-            wb_obj = openpyxl.load_workbook(excel_file_name)
-            sheet_obj = wb_obj.active
-            break
+            if input("There is an existing processing.xlsx file, do you want to use this file? (y/n)") == "y":
+                excel_file_name = "processing.xlsx"
+                wb_obj = openpyxl.load_workbook(excel_file_name)
+                sheet_obj = wb_obj.active
+                break
+
     else:
         parser = argparse.ArgumentParser(description="This is a description of your program.")
+        
         parser.add_argument("excel_file_name", help="excel原始檔")
         parser.add_argument("--sheet", help="sheet名稱")
         excel_file_name = parser.parse_args().excel_file_name
@@ -155,24 +198,28 @@ if __name__ == "__main__":
     driver = webdriver.Firefox()
     start = find_start(sheet_obj, 1)
     set_header(sheet_obj, start, output_path)
-    col_ID = find_name(["分", '準'], sheet_obj, 1)
+    col_ID = find_name(['分','准'], sheet_obj, 1)
     col_PID = find_name(["身分證"], sheet_obj, 1)
     for i in range(2, row+1):
-        if str(sheet_obj.cell(row=i, column=start).value).replace(" ", "").isnumeric(): continue
-        ID = str(sheet_obj.cell(row=i, column=col_ID).value)
-        PID = str(sheet_obj.cell(row=i, column=col_PID).value)
+        # print(f'"{sheet_obj.cell(row=i, column=start).value}"')
+        if str(sheet_obj.cell(row=i, column=start).value) != "None": continue
+        ID = str(sheet_obj.cell(row=i, column=col_ID).value).replace("\n", "")
+        PID = str(sheet_obj.cell(row=i, column=col_PID).value).replace("\n", "")
 
         if len(ID) != 8: continue
         print(ID, PID)
         success = login(driver, ID, PID)
-        if success == -1:
+        # print(success)
+        if success == "secret":
+            sheet_obj.cell(row=i, column=start).value = "成績查詢已保密"
+            wb_obj.save(output_path)
             continue
-        data = get_data(driver)
+        data = get_data_ast(driver)
+        # print(data)
         if data == -1:
             continue
-        print(data)
         save_data(data, sheet_obj, start, i, output_path)
-    wb_obj.save(os.path.join("finished", sheet_obj.name.split("/")[-1].split(".")[0] + "(已完成).xlsx"))
+    wb_obj.save(os.path.join("finished", str(sheet_obj).split("/")[-1].split(".")[0] + "(已完成).xlsx"))
     for root, dirs, files in os.walk('.'):
         if "processing.xlsx" in files:
             os.remove("processing.xlsx")
