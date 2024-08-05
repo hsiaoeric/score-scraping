@@ -16,8 +16,8 @@ class MainWindow(QWidget):
         self.label = QLabel("請選擇excel", self)
         layout.addWidget(self.label)
 
-        self.line_edit = QLineEdit(self)
-        layout.addWidget(self.line_edit)
+        # self.line_edit = QLineEdit(self)
+        # layout.addWidget(self.line_edit)
 
 
         

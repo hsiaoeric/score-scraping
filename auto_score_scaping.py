@@ -6,6 +6,12 @@ import pytesseract
 import openpyxl
 import argparse
 import os
+import io
+import numpy as np
+from PIL import Image
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
 
 url = "https://ap.ceec.edu.tw/RegExam/ScoreSearch/Login?examtype=B"
 
@@ -21,23 +27,24 @@ url = "https://ap.ceec.edu.tw/RegExam/ScoreSearch/Login?examtype=B"
 # input("=====================================")
 
 def solve_captcha(driver):
-    driver.save_screenshot('screenshot.png')
-    image = cv2.imread('screenshot.png')
+    png = driver.get_screenshot_as_png()
+    screenshot = Image.open(io.BytesIO(png))
+    screenshot = np.array(screenshot)
     # image = image[loc['y']: loc['y']+500, loc['x']: loc['x']+500]
-    image = image[1170: 1216, 809: 959]
+    image = screenshot[1170: 1216, 809: 959]
     raw_string = pytesseract.image_to_string(image, lang="eng", config='--psm 13 -c tessedit_char_whitelist=0123456789').replace("\n", '')
     print(raw_string)
-    elem = driver.find_element(By.ID, "Captcha")
-    btn = elem.find_element(By.XPATH, "./..")
-    if len(raw_string) != 4:
+    btn = driver.find_element(By.XPATH, "/html/body/div[2]/div/div[1]/div/form/div[3]/button[1]")
+    if len(raw_string) != 4 and len(raw_string) != 3:
         btn.click()
         solve_captcha(driver)
         return
     
     solution = int(raw_string[:2]) + int(raw_string[-1])  
     print(solution)
+    elem = driver.find_element(By.ID, "Captcha")
     elem.send_keys(solution)
-    driver.find_element(By.ID, "login").click()
+    
 def login(driver, ID, PID, fail_count=0):
     if fail_count > 5:
         return -1
@@ -47,23 +54,39 @@ def login(driver, ID, PID, fail_count=0):
     elem = driver.find_element(By.ID, "PID")
     elem.send_keys(PID)
     solve_captcha(driver)
+    driver.find_element(By.ID, "login").click()
+
     # img = driver.find_element(By.ID, "valiCode")
     # loc = img.location
     
     # input("wait")
     if driver.current_url != "https://ap.ceec.edu.tw/RegExam/ScoreSearch/StuResult":
-        prompt_text = driver.find_element(By.XPATH, "/html/body/div[4]/div[2]/div/div/div/div/div/div/div/div[3]/div/div").text
-        while (not prompt_text):
-            prompt_text = driver.find_element(By.XPATH, "/html/body/div[4]/div[2]/div/div/div/div/div/div/div/div[3]/div/div").text
+        # prompt_text = driver.find_element(By.XPATH, "/html/body/div[4]/div[2]/div/div/div/div/div/div/div/div[3]/div/div").text
+        # while (not prompt_text):
+        
+        #     prompt_text = driver.find_element(By.XPATH, "/html/body/div[4]/div[2]/div/div/div/div/div/div/div/div[3]/div/div").text
+        # if prompt_text == "成績查詢已保密":
+        #     print("成績查詢已保密")
+        #     return "secret"
+        
+        wait = WebDriverWait(driver, 5)
+        while(True):
+            try:
+                prompt_text = wait.until(
+                    # EC.presence_of_element_located((By.CLASS_NAME, "jconfirm-title"))
+                    # EC.text_to_be_present_in_element_value((By.CLASS_NAME, 'jconfirm-title'), "訊息")
+                    EC.presence_of_element_located((By.XPATH, "/html/body/div[4]/div[2]/div/div/div/div/div/div/div/div[3]/div/div"))
+                    # EC.visibility_of_element_located((By.XPATH, "/html/body/div[4]/div[2]/div/div/div/div/div/div/div/div[3]/div/div"))
+                    ).text
+            except selenium.common.exceptions.TimeoutException:
+                return
+            if prompt_text: break
+            
+        print(f'"{prompt_text}"')
         if prompt_text == "成績查詢已保密":
-            print("成績查詢已保密")
+            print(prompt_text)
             return "secret"
-        login(driver, ID, PID, fail_count+1)
-    # try:
-        # if driver.find_element(By.CLASS_NAME, "jconfirm-buttons"):
-        #     login(driver, ID, PID, fail_count+1)
-    # except: pass
-
+        return login(driver, ID, PID, fail_count+1)
 
 # out = cv2.CreateImage((150,60), image.depth, 3)
 # cv2.SetImageROI(image, (loc['x'],loc['y'],150,60))
@@ -161,12 +184,17 @@ def find_name(name_list, sheet_obj, row):
         if all([i in val for i in name_list]): return pointer
 
 if __name__ == "__main__":
-    for root, dirs, files in os.walk('.'):
-        if "processing.xlsx" in files:
-            if input("There is an existing processing.xlsx file, do you want to use this file? (y/n)") == "y":
-                excel_file_name = "processing.xlsx"
+    files = os.listdir('.')
+    for file in files:
+        if file.startswith("processing_"):
+            excel_file_name = file
+
+            print(f"There is an existing {excel_file_name}.")
+            if input("Do you want to use this sheet? (y/n)") == "y":
                 wb_obj = openpyxl.load_workbook(excel_file_name)
                 sheet_obj = wb_obj.active
+                output_path = excel_file_name
+                # mode = "continue"
                 break
 
     else:
@@ -181,14 +209,15 @@ if __name__ == "__main__":
             sheet_obj = wb_obj[excel_sheet_name]
         else: 
             sheet_obj = wb_obj.active
-
+        excel_file_name = excel_file_name.split("/")[-1]
+        output_path = f"processing_{excel_file_name}"
     # parser.add_argument("--output", required=True, help="output excel檔")
 #   wait for altering
     # excels_path = "excels/黎明(方濟會)分科準0728.xlsx"
     # excels_path = "excels/0625港明分科准xlsx.xlsx"
     # excels_path = "excels/0703文華分科准.xlsx"
 
-    output_path = "processing.xlsx"
+    # output_path = "processing.xlsx"
     
     # excels_path = "output.xlsx"
 
@@ -219,10 +248,12 @@ if __name__ == "__main__":
         if data == -1:
             continue
         save_data(data, sheet_obj, start, i, output_path)
-    wb_obj.save(os.path.join("finished", str(sheet_obj).split("/")[-1].split(".")[0] + "(已完成).xlsx"))
-    for root, dirs, files in os.walk('.'):
-        if "processing.xlsx" in files:
-            os.remove("processing.xlsx")
+    wb_obj.save(os.path.join("finished", output_path.split("sing_")[-1] + "(已完成).xlsx"))
+    os.remove(output_path)
+
+    # for root, dirs, files in os.walk('.'):
+    #     if "processing.xlsx" in files:
+    #         os.remove("processing.xlsx")
 
     driver.quit()
     print("finished")
