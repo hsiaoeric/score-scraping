@@ -15,8 +15,9 @@ import io
 import time
 import numpy as np
 
-url = "https://ap.ceec.edu.tw/RegExam/RegInfo/Login?examtype=B"
+url_B = "https://ap.ceec.edu.tw/RegExam/RegInfo/Login?examtype=B"
 url_A = "https://ap.ceec.edu.tw/RegExam/RegInfo/Login?examtype=A"
+url = url_A
 
 def solve_captcha(driver):
     # captcha_image = driver.find_element(By.XPATH, "/html/body/div[2]/div/div[1]/div/form/div[3]/button[1]")
@@ -93,7 +94,13 @@ def login(driver, PID, born_year, born_month, born_date, fail_count=0):
     # time.sleep(0.5)
     # input("wait")
     # 要改/html/body/div[4]/div[2]/div/div/div/div/div/div/div/div[3]/div/div
-    if driver.current_url != "https://ap.ceec.edu.tw/RegExam/RegInfo/RegInfoSearch?examtype=B":
+    info_A = "https://ap.ceec.edu.tw/RegExam/RegInfo/RegInfoSearch?examtype=A"
+    info_B = "https://ap.ceec.edu.tw/RegExam/RegInfo/RegInfoSearch?examtype=B"
+    if url == url_A:
+        info_url = info_A
+    else:
+        info_url = info_B
+    if driver.current_url != info_url:
         wait = WebDriverWait(driver, 5)
         while(True):
             try:
@@ -133,7 +140,9 @@ def get_data(driver):
     # except selenium.common.exceptions.NoSuchElementException: return -1
 def set_header(sheet_obj, start, output_path):
     # objects_list = ['數學甲', '化學', '物理', '生物', '歷史', '地理', '公民', '國文', '英文', '數學Ａ', '數學Ｂ', '社會', '自然']
-    object = '分科準考證號碼'
+    if url == url_B:
+        object = '分科准考證號碼'
+    else: object = '學測准考證號碼'
     # for subject, i in zip(objects_list, range(13)):
     print(start)
     sheet_obj.cell(row=1, column=start).value = object
@@ -219,13 +228,18 @@ if __name__ == "__main__":
     # driver = webdriver.Firefox(options=chrome_options)
 
     driver = webdriver.Firefox()
+    if url == url_B:
+        col_ast_id = find_name(["分", '准'], sheet_obj, 1)
+    else:
+        col_ast_id = find_name(['學', '准'], sheet_obj, 1)
 
-    col_ast_id = find_name(["分", '准'], sheet_obj, 1)
     print(col_ast_id)
     if col_ast_id == -1:
         col_ast_id = find_start(sheet_obj, 1)
+        print(col_ast_id)
+        # input("wait")
         set_header(sheet_obj, col_ast_id, output_path)
-    # input("wait")
+        
     # if col_ast_id == -1:
 
     col_PID = find_name(["身", '證'], sheet_obj, 1)
@@ -264,12 +278,20 @@ if __name__ == "__main__":
             print(success)
             save_data("已保密", sheet_obj, col_ast_id, i, output_path)
             continue
+        if success == -1:
+            print("驗證碼錯誤次數過多")
+            save_data("驗證碼錯誤次數過多", sheet_obj, col_ast_id, i, output_path)
+            continue
         data = get_data(driver)
         if data == -1:
+            sheet_obj.cell(row=i, column=col_ast_id).value = "登入成功但資料讀取失敗"
             continue
         # print(data)
         save_data(data, sheet_obj, col_ast_id, i, output_path)
-    wb_obj.save(os.path.join("finished", output_path.split("sing_")[-1] + "(已完成分准).xlsx"))
+    saved_name = output_path.split("sing_")[-1] + "(已完成分准).xlsx"
+    wb_obj.save(os.path.join("finished", saved_name))
+    print(saved_name)
+
     os.remove(output_path)
 
     # for root, dirs, files in os.listdir('.'):
